@@ -185,14 +185,18 @@ namespace Network
 
             internal int Encode(byte[] ptr, int offset)
             {
+                UInt32 len = 0;
+                if (data != null)
+                    len = (UInt32)data.Length;
+
                 ikcp_encode32u(ptr, offset, conv);
-                ikcp_encode8u(ptr, offset, (byte)cmd);
-                ikcp_encode8u(ptr, offset, (byte)frg);
-                ikcp_encode16u(ptr, offset, (UInt16)wnd);
-                ikcp_encode32u(ptr, offset, ts);
-                ikcp_encode32u(ptr, offset, sn);
-                ikcp_encode32u(ptr, offset, una);
-                ikcp_encode32u(ptr, offset, (UInt32)data.Length);
+                ikcp_encode8u(ptr, offset + 4, (byte)cmd);
+                ikcp_encode8u(ptr, offset + 5, (byte)frg);
+                ikcp_encode16u(ptr, offset + 6, (UInt16)wnd);
+                ikcp_encode32u(ptr, offset + 8, ts);
+                ikcp_encode32u(ptr, offset + 12, sn);
+                ikcp_encode32u(ptr, offset + 16, una);
+                ikcp_encode32u(ptr, offset + 20, len);
                 return IKCP_OVERHEAD;
             }
 
@@ -273,6 +277,12 @@ namespace Network
             ssthresh = IKCP_THRESH_INIT;
             dead_link = IKCP_DEADLINK;
             buffer = new byte[(mtu + IKCP_OVERHEAD) * 3];
+
+            // magic number to identifiy queue head sentinel
+            snd_queue.conv = 20170901;
+            rcv_queue.conv = 20170902;
+            snd_buf.conv = 20170903;
+            rcv_buf.conv = 20170904;
         }
 
         public void Release()
@@ -512,8 +522,11 @@ namespace Network
 
         void ParseUNA(UInt32 una)
         {
-            for (var seg = snd_buf.next; seg != snd_buf; seg = seg.next)
+            var seg = snd_buf;
+            var count = nsnd_buf;
+            for (int i = 0; i < count; i++)
             {
+                seg = seg.next;
                 if (_itimediff(una, seg.sn) > 0)
                 {
                     seg.DelEntry();
