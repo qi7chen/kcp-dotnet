@@ -249,15 +249,17 @@ namespace Network
         UInt32 ackblock = 0;
 
         byte[] buffer;
+        object user;
 
         Int32 fastresend = 0;
         Int32 nocwnd = 0;
 
-        Action<byte[], int> output;
+        public delegate void OutputDelegate(byte[] data, int size, object user);
+        OutputDelegate output;
 
-        KCP(UInt32 conv_, Action<byte[], int> output_)
+        public KCP(UInt32 conv_, object ud)
         {
-            output = output_;
+            user = ud;
             conv = conv_;
             snd_wnd = IKCP_WND_SND;
             rcv_wnd = IKCP_WND_RCV;
@@ -273,7 +275,7 @@ namespace Network
             buffer = new byte[(mtu + IKCP_OVERHEAD) * 3];
         }
 
-        void Release()
+        public void Release()
         {
             while (!snd_buf.IsEmpty())
             {
@@ -306,13 +308,13 @@ namespace Network
         }
 
         // set output callback, which will be invoked by kcp
-        void SetOutput(Action<byte[], int> output_)
+        public void SetOutput(OutputDelegate output_)
         {
             output = output_;
         }
 
         // user/upper level recv: returns size, returns below zero for EAGAIN
-        int Recv(byte[] buffer, int offset, int len)
+        public int Recv(byte[] buffer, int offset, int len)
         {
             if (rcv_queue.IsEmpty())
                 return -1;
@@ -390,7 +392,7 @@ namespace Network
         }
 
         // peek data size
-        int PeekSize()
+        public int PeekSize()
         {
             if (rcv_queue.IsEmpty())
                 return -1;
@@ -413,7 +415,7 @@ namespace Network
         }
 
         // user/upper level send, returns below zero for error
-        int Send(byte[] buffer, int offset, int len)
+        public int Send(byte[] buffer, int offset, int len)
         {
             Debug.Assert(mss > 0);
             if (len < 0)
@@ -792,7 +794,7 @@ namespace Network
             {
                 if ((offset + IKCP_OVERHEAD) > mtu)
                 {
-                    output(buffer, offset);
+                    output(buffer, offset, user);
                     offset = 0;
                 }
                 ACKGet(i, ref seg.sn, ref seg.ts);
@@ -834,7 +836,7 @@ namespace Network
                 seg.cmd = IKCP_CMD_WASK;
                 if ((offset + IKCP_OVERHEAD) > mtu)
                 {
-                    output(buffer, offset);
+                    output(buffer, offset, user);
                     offset = 0;
                 }
                 offset += seg.Encode(buffer, offset);
@@ -846,7 +848,7 @@ namespace Network
                 seg.cmd = IKCP_CMD_WINS;
                 if ((offset + IKCP_OVERHEAD) > mtu)
                 {
-                    output(buffer, offset);
+                    output(buffer, offset, user);
                     offset = 0;
                 }
                 offset += seg.Encode(buffer, offset);
@@ -934,7 +936,7 @@ namespace Network
 
                     if (offset + need > mtu)
                     {
-                        output(buffer, offset);
+                        output(buffer, offset, user);
                         offset = 0;
                     }
                     offset += segment.Encode(buffer, offset);
@@ -951,7 +953,7 @@ namespace Network
             // flush remain segments
             if (offset > 0)
             {
-                output(buffer, offset);
+                output(buffer, offset, user);
                 offset = 0;
             }
 
@@ -1055,7 +1057,7 @@ namespace Network
             return current_ + minimal;
         }
 
-        int SetMTU(int mtu_)
+        public int SetMTU(int mtu_)
         {
             if (mtu_ < 50 || mtu_ < IKCP_OVERHEAD)
                 return -1;
@@ -1066,7 +1068,7 @@ namespace Network
             return 0;
         }
 
-        int Interval(int interval_)
+        public int Interval(int interval_)
         {
             if (interval_ > 5000)
                 interval_ = 5000;
@@ -1077,7 +1079,7 @@ namespace Network
             return 0;
         }
 
-        int NoDelay(int nodelay_, int interval_, int resend_, int nc)
+        public int NoDelay(int nodelay_, int interval_, int resend_, int nc)
         {
             if (nodelay >= 0)
             {
@@ -1110,19 +1112,38 @@ namespace Network
             return 0;
         }
 
-        int WaitSnd()
+        public int WndSize(int sndwnd, int rcvwnd)
+        {
+            if (sndwnd > 0)
+                snd_wnd = (UInt32)sndwnd;
+            if (rcvwnd > 0)
+                rcv_wnd = (UInt32)rcvwnd;
+            return 0;
+        }
+
+        public int WaitSnd()
         {
             return (int)(nsnd_buf + nsnd_que);
         }
 
-        UInt32 GetConv()
+        public UInt32 GetConv()
         {
             return conv;
         }
 
+        public void SetMinRTO(int minrto)
+        {
+            rx_minrto = minrto;
+        }
+
+        public void SetFastresend(int resend)
+        {
+            fastresend = resend;
+        }
+
         void Log(int mask, string format, params object[] args)
         {
-            
+            // log things
         }
     }
 }
