@@ -27,8 +27,9 @@ namespace Network
 
         public DelayPacket(byte[] data_, int size_)
         {
-            data = data_;
             size = size_;
+            data = new byte[size_];
+            Array.Copy(data_, 0, data, 0, size);
         }
 
         public byte[] Ptr()

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Threading;
+using System.Diagnostics;
 using Network;
 
 namespace Test
@@ -92,7 +93,8 @@ namespace Test
                         break;
 
                     // 如果 p2收到udp，则作为下层协议输入到kcp2
-                    kcp2.Input(buffer, 0, hr);
+                    hr = kcp2.Input(buffer, 0, hr);
+                    Debug.Assert(hr >= 0);
                 }
 
                 // 处理虚拟网络：检测是否有udp包从p2->p1
@@ -103,7 +105,8 @@ namespace Test
                         break;
 
                     // 如果 p1收到udp，则作为下层协议输入到kcp1
-                    kcp1.Input(buffer, 0, hr);
+                    hr = kcp1.Input(buffer, 0, hr);
+                    Debug.Assert(hr >= 0);
                 }
 
                 // kcp2接收到任何包都返回回去
@@ -114,7 +117,8 @@ namespace Test
                         break;
 
                     // 如果收到包就回射
-                    kcp2.Send(buffer, 0, hr);
+                    hr = kcp2.Send(buffer, 0, hr);
+                    Debug.Assert(hr >= 0);
                 }
 
                 // kcp1收到kcp2的回射数据
@@ -142,16 +146,16 @@ namespace Test
                         maxrtt = (int)rtt;
 
                     Console.WriteLine(String.Format("[RECV] mode={0} sn={1} rtt={2}", mode, sn, rtt));
-                    if (next > 1000)
-                        break;
                 }
-                ts1 = Utils.iclock() - ts1;
-                var names = new string[3] { "default", "normal", "fast" };
-                Console.WriteLine("{0} mode result ({1}ms):", names[mode], ts1);
-                Console.WriteLine("avgrtt={0} maxrtt={1} tx={2}", sumrtt / count, maxrtt, vnet.tx1);
-                Console.WriteLine("Press any key to next...");
-                Console.Read();
+                if (next > 1000)
+                    break;
             }
+            ts1 = Utils.iclock() - ts1;
+            var names = new string[3] { "default", "normal", "fast" };
+            Console.WriteLine("{0} mode result ({1}ms):", names[mode], ts1);
+            Console.WriteLine("avgrtt={0} maxrtt={1} tx={2}", sumrtt / count, maxrtt, vnet.tx1);
+            Console.WriteLine("Press any key to next...");
+            Console.Read();
         }
 
         static void Main(string[] args)
