@@ -29,7 +29,7 @@ namespace Network
         {
             size_ = size;
             data_ = new byte[size];
-            Array.Copy(data, 0, data_, 0, size);
+            Buffer.BlockCopy(data, 0, data_, 0, size);
         }
 
         public byte[] Data()
@@ -64,11 +64,17 @@ namespace Network
         private int rttmin_;
         private int rttmax_;
         private int nmax_;
-        private LinkedList<DelayPacket> p12_ = new LinkedList<DelayPacket>();
-        private LinkedList<DelayPacket> p21_ = new LinkedList<DelayPacket>();
-        private Random r12_ = new Random();
-        private Random r21_ = new Random();
-        private Random rand_ = new Random();
+        private LinkedList<DelayPacket> p12_;
+        private LinkedList<DelayPacket> p21_;
+        private Random r12_;
+        private Random r21_;
+        private Random rand_;
+
+        public static int GetRandomSeed()
+        {
+            var guid = new Guid();
+            return guid.GetHashCode();
+        }
 
         // lostrate: 往返一周丢包率的百分比，默认 10%
         // rttmin：rtt最小值，默认 60
@@ -80,6 +86,12 @@ namespace Network
             rttmin_ = rttmin / 2;
             rttmax_ = rttmax / 2;
             nmax_ = nmax;
+
+            r12_ = new Random(GetRandomSeed());
+            r21_ = new Random(GetRandomSeed());
+            rand_ = new Random(GetRandomSeed());
+            p12_ = new LinkedList<DelayPacket>();
+            p21_ = new LinkedList<DelayPacket>();
         }
 
         public void Clear()
@@ -151,7 +163,7 @@ namespace Network
                 p12_.RemoveFirst();
 
             maxsize = pkt.Size();
-            Array.Copy(pkt.Data(), 0, data, 0, maxsize);
+            Buffer.BlockCopy(pkt.Data(), 0, data, 0, maxsize);
             return maxsize;
         }
     }

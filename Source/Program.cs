@@ -3,7 +3,7 @@ using System.Threading;
 using System.Diagnostics;
 using Network;
 
-namespace Test
+namespace UnitTest
 {
     class Program
     {
@@ -15,7 +15,8 @@ namespace Test
             vnet.Send(peer, data, size);
         }
 
-        static void RunTest(int mode)
+        // 测试用例
+        static void KCPTest(int mode)
         {
             // 创建模拟网络：丢包率10%，Rtt 60ms~125ms
             vnet = new LatencySimulator(10, 60, 125);
@@ -61,7 +62,7 @@ namespace Test
                 kcp1.NoDelay(1, 10, 2, 1);
                 kcp2.NoDelay(1, 10, 2, 1);
                 kcp1.SetMinRTO(10);
-                kcp1.SetFastresend(1);
+                kcp1.SetFastResend(1);
             }
 
             var buffer = new byte[2000];
@@ -160,9 +161,9 @@ namespace Test
 
         static void Main(string[] args)
         {
-            RunTest(0); // 默认模式，类似 TCP：正常模式，无快速重传，常规流控
-            RunTest(1); // 普通模式，关闭流控等
-            RunTest(2); // 快速模式，所有开关都打开，且关闭流控
+            KCPTest(0); // 默认模式，类似 TCP：正常模式，无快速重传，常规流控
+            KCPTest(1); // 普通模式，关闭流控等
+            KCPTest(2); // 快速模式，所有开关都打开，且关闭流控
         }
     }
 }
