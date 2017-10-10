@@ -128,21 +128,14 @@ namespace Network
             internal UInt32 xmit = 0;
             internal byte[] data;
 
-            internal Segment()
-            {
-            }
-
-            internal Segment(int size)
+            internal Segment(int size = 0)
             {
                 data = new byte[size];
             }
 
-            internal int Encode(byte[] ptr, int offset)
+            internal void Encode(byte[] ptr, ref int offset)
             {
-                UInt32 len = 0;
-                if (data != null)
-                    len = (UInt32)data.Length;
-
+                UInt32 len = (UInt32)data.Length;
                 ikcp_encode32u(ptr, offset, conv);
                 ikcp_encode8u(ptr, offset + 4, (byte)cmd);
                 ikcp_encode8u(ptr, offset + 5, (byte)frg);
@@ -151,7 +144,7 @@ namespace Network
                 ikcp_encode32u(ptr, offset + 12, sn);
                 ikcp_encode32u(ptr, offset + 16, una);
                 ikcp_encode32u(ptr, offset + 20, len);
-                return IKCP_OVERHEAD;
+                offset += IKCP_OVERHEAD;
             }
 
         }
@@ -264,6 +257,9 @@ namespace Network
         // user/upper level recv: returns size, returns below zero for EAGAIN
         public int Recv(byte[] buffer, int offset, int len)
         {
+            int ispeek = (len < 0 ? 1 : 0);
+            int recover = 0;
+
             if (rcv_queue_.Count == 0)
                 return -1;
 
@@ -277,9 +273,6 @@ namespace Network
             if (peeksize > len)
                 return -3;
 
-            int ispeek = (len < 0 ? 1 : 0);
-
-            int recover = 0;
             if (nrcv_que_ >= rcv_wnd_)
                 recover = 1;
 
@@ -288,18 +281,19 @@ namespace Network
             LinkedListNode<Segment> next = null;
             for (var node = rcv_queue_.First; node != null; node = next)
             {
+                int fragment = 0;
                 var seg = node.Value;
                 next = node.Next;
-                int fragment = 0;
+                
                 if (buffer != null)
                 {
-                    Array.Copy(seg.data, 0, buffer, offset, seg.data.Length);
+                    Buffer.BlockCopy(seg.data, 0, buffer, offset, seg.data.Length);
                     offset += seg.data.Length;
                 }
                 len += seg.data.Length;
                 fragment = (int)seg.frg;
 
-                Log(IKCP_LOG_RECV, "recv sn=%lu", seg.sn);
+                Log(IKCP_LOG_RECV, "recv sn={0}", seg.sn);
 
                 if (ispeek == 0)
                 {
@@ -398,7 +392,7 @@ namespace Network
                 var seg = new Segment(size);
                 if (buffer != null && len > 0)
                 {
-                    Array.Copy(buffer, offset, seg.data, 0, size);
+                    Buffer.BlockCopy(buffer, offset, seg.data, 0, size);
                     offset += size;
                 }
                 seg.frg = (UInt32)(count - i - 1);
@@ -438,7 +432,8 @@ namespace Network
             var node = snd_buf_.First;
             if (node != null)
             {
-                snd_una_ = node.Value.sn;
+                var seg = node.Value;
+                snd_una_ = seg.sn;
             }
             else
             {
@@ -451,9 +446,11 @@ namespace Network
             if (_itimediff(sn, snd_una_) < 0 || _itimediff(sn, snd_nxt_) >= 0)
                 return;
 
-            for (var node = snd_buf_.First; node != null; node = node.Next)
+            LinkedListNode<Segment> next = null;
+            for (var node = snd_buf_.First; node != null; node = next)
             {
                 var seg = node.Value;
+                next = node.Next;
                 if (sn == seg.sn)
                 {
                     snd_buf_.Remove(node);
@@ -489,9 +486,11 @@ namespace Network
             if (_itimediff(sn, snd_una_) < 0 || _itimediff(sn, snd_nxt_) >= 0)
                 return;
 
-            for (var node = snd_buf_.First; node != null; node = node.Next)
+            LinkedListNode<Segment> next = null;
+            for (var node = snd_buf_.First; node != null; node = next)
             {
                 var seg = node.Value;
+                next = node.Next;
                 if (_itimediff(sn, seg.sn) < 0)
                 {
                     break;
@@ -540,17 +539,20 @@ namespace Network
         void ParseData(Segment newseg)
         {
             UInt32 sn = newseg.sn;
+            int repeat = 0;
+
             if (_itimediff(sn, rcv_nxt_ + rcv_wnd_) >= 0 ||
                 _itimediff(sn, rcv_nxt_) < 0)
             {
                 return;
             }
 
-            int repeat = 0;
             LinkedListNode<Segment> node = null;
-            for (node = rcv_buf_.Last; node != null; node = node.Previous)
+            LinkedListNode<Segment> prev = null;
+            for (node = rcv_buf_.Last; node != null; node = prev)
             {
                 var seg = node.Value;
+                prev = node.Previous;
                 if (seg.sn == sn)
                 {
                     repeat = 1;
@@ -569,7 +571,7 @@ namespace Network
                 }
                 else
                 {
-                    rcv_buf_.AddLast(newseg);
+                    rcv_buf_.AddFirst(newseg);
                 }
                 nrcv_buf_++;
             }
@@ -597,14 +599,14 @@ namespace Network
         // input data
         public int Input(byte[] data, int offset, int size)
         {
+            UInt32 maxack = 0;
+            int flag = 0;
+
             Log(IKCP_LOG_INPUT, "[RI] {0} bytes", size);
 
             if (data == null || size < IKCP_OVERHEAD)
                 return -1;
 
-            UInt32 maxack = 0;
-            int flag = 0;
-            UInt32 una = 0;
             while (true)
             {
                 if (size < IKCP_OVERHEAD)
@@ -618,7 +620,7 @@ namespace Network
                 UInt32 wnd = ikcp_decode16u(data, ref offset);
                 UInt32 ts = ikcp_decode32u(data, ref offset);
                 UInt32 sn = ikcp_decode32u(data, ref offset);
-                una = ikcp_decode32u(data, ref offset);
+                UInt32 una = ikcp_decode32u(data, ref offset);
                 UInt32 len = ikcp_decode32u(data, ref offset);
 
                 size -= IKCP_OVERHEAD;
@@ -674,7 +676,7 @@ namespace Network
                             seg.una = una;
                             if (len > 0)
                             {
-                                Array.Copy(data, offset, seg.data, 0, (int)len);
+                                Buffer.BlockCopy(data, offset, seg.data, 0, (int)len);
                             }
                             ParseData(seg);
                         }
@@ -706,8 +708,8 @@ namespace Network
                 ParseFastACK(maxack);
             }
 
-            una = snd_una_;
-            if (_itimediff(snd_una_, una) > 0)
+            UInt32 unack = snd_una_;
+            if (_itimediff(snd_una_, unack) > 0)
             {
                 if (cwnd_ < rmt_wnd_)
                 {
@@ -745,17 +747,21 @@ namespace Network
         // ikcp_flush
         void Flush()
         {
+            int change = 0;
+            int lost = 0;
+            int offset = 0;
+
             // 'ikcp_update' haven't been called. 
             if (updated_ == 0)
                 return;
 
-            int offset = 0;
-
-            var seg = new Segment();
-            seg.conv = conv_;
-            seg.cmd = IKCP_CMD_ACK;
-            seg.wnd = (UInt32)WndUnused();
-            seg.una = rcv_nxt_;
+            var seg = new Segment
+            {
+                conv = conv_,
+                cmd = IKCP_CMD_ACK,
+                wnd = (UInt32)WndUnused(),
+                una = rcv_nxt_,
+            };
 
             // flush acknowledges
             int count = (int)ackcount_;
@@ -767,7 +773,7 @@ namespace Network
                     offset = 0;
                 }
                 ACKGet(i, ref seg.sn, ref seg.ts);
-                offset += seg.Encode(buffer_, offset);
+                seg.Encode(buffer_, ref offset);
             }
 
             ackcount_ = 0;
@@ -809,7 +815,7 @@ namespace Network
                     output_(buffer_, offset, user_);
                     offset = 0;
                 }
-                offset += seg.Encode(buffer_, offset);
+                seg.Encode(buffer_, ref offset);
             }
 
             // flush window probing commands
@@ -821,7 +827,7 @@ namespace Network
                     output_(buffer_, offset, user_);
                     offset = 0;
                 }
-                offset += seg.Encode(buffer_, offset);
+                seg.Encode(buffer_, ref offset);
             }
 
             probe_ = 0;
@@ -829,7 +835,7 @@ namespace Network
             // calculate window size
             UInt32 cwnd = _imin_(snd_wnd_, rmt_wnd_);
             if (nocwnd_ == 0)
-                cwnd_ = _imin_(cwnd_, cwnd);
+                cwnd = _imin_(cwnd_, cwnd);
 
             // move data from snd_queue to snd_buf
             while (_itimediff(snd_nxt_, snd_una_ + cwnd) < 0)
@@ -859,9 +865,6 @@ namespace Network
             // calculate resent
             UInt32 resent = (fastresend_ > 0 ? (UInt32)fastresend_ : 0xffffffff);
             UInt32 rtomin = (nodelay_ == 0 ? (UInt32)(rx_rto_ >> 3) : 0);
-
-            int change = 0;
-            int lost = 0;
 
             // flush data segments
             for (var node = snd_buf_.First; node != null; node = node.Next)
@@ -911,10 +914,10 @@ namespace Network
                         output_(buffer_, offset, user_);
                         offset = 0;
                     }
-                    offset += segment.Encode(buffer_, offset);
-                    if (segment.data != null && segment.data.Length > 0)
+                    segment.Encode(buffer_, ref offset);
+                    if (segment.data.Length > 0)
                     {
-                        Array.Copy(segment.data, 0, buffer_, offset, segment.data.Length);
+                        Buffer.BlockCopy(segment.data, 0, buffer_, offset, segment.data.Length);
                         offset += segment.data.Length;
                     }
                     if (segment.xmit >= dead_link_)
@@ -978,7 +981,7 @@ namespace Network
             if (slap >= 0)
             {
                 ts_flush_ += interval_;
-                if (_itimediff(current, ts_flush_) >= 0)
+                if (_itimediff(current_, ts_flush_) >= 0)
                     ts_flush_ = current_ + interval_;
 
                 Flush();
@@ -999,7 +1002,7 @@ namespace Network
             Int32 tm_packet = 0x7fffffff;
 
             if (updated_ == 0)
-                return current_;
+                return current;
 
             if (_itimediff(current, ts_flush) >= 10000 || 
                 _itimediff(current, ts_flush) < -10000)
@@ -1122,7 +1125,7 @@ namespace Network
 
         void Log(int mask, string format, params object[] args)
         {
-            // log things
+            // Console.WriteLine(mask + String.Format(format, args));
         }
     }
 }
