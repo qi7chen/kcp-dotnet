@@ -21,35 +21,35 @@ namespace Network
     // 带延迟的数据包
     public class DelayPacket
     {
-        private byte[] data;
-        private int size;
-        private UInt32 ts;
+        private byte[]  data_;
+        private int     size_;
+        private UInt32  ts_;
 
-        public DelayPacket(byte[] data_, int size_)
+        public DelayPacket(byte[] data, int size)
         {
-            size = size_;
-            data = new byte[size_];
-            Array.Copy(data_, 0, data, 0, size);
+            size_ = size;
+            data_ = new byte[size];
+            Array.Copy(data, 0, data_, 0, size);
         }
 
-        public byte[] Ptr()
+        public byte[] Data()
         {
-            return data;
+            return data_;
         }
 
         public int Size()
         {
-            return size;
+            return size_;
         }
 
         public UInt32 Ts()
         {
-            return ts;
+            return ts_;
         }
 
-        public void SetTs(UInt32 ts_)
+        public void SetTs(UInt32 ts)
         {
-            ts = ts_;
+            ts_ = ts;
         }
     }
 
@@ -58,60 +58,69 @@ namespace Network
     {
         public int tx1 = 0;
         public int tx2 = 0;
-        private UInt32 current;
-        private int lostrate;
-        int rttmin;
-        int rttmax;
-        int nmax;
-        List<DelayPacket> p12 = new List<DelayPacket>();
-        List<DelayPacket> p21 = new List<DelayPacket>();
-        Random r12 = new Random();
-        Random r21 = new Random();
-        Random rand = new Random();
+
+        private UInt32 current_;
+        private int lostrate_;
+        private int rttmin_;
+        private int rttmax_;
+        private int nmax_;
+        private LinkedList<DelayPacket> p12_ = new LinkedList<DelayPacket>();
+        private LinkedList<DelayPacket> p21_ = new LinkedList<DelayPacket>();
+        private Random r12_ = new Random();
+        private Random r21_ = new Random();
+        private Random rand_ = new Random();
 
         // lostrate: 往返一周丢包率的百分比，默认 10%
         // rttmin：rtt最小值，默认 60
         // rttmax：rtt最大值，默认 125
-        public LatencySimulator(int lostrate_ = 10, int rttmin_ = 60, int rttmax_ = 125, int nmax_ = 1000)
+        public LatencySimulator(int lostrate = 10, int rttmin = 60, int rttmax = 125, int nmax = 1000)
         {
-            current = Utils.iclock();
-            lostrate = lostrate_ / 2;
-            rttmin = rttmin_ / 2;
-            rttmax = rttmax_ / 2;
-            nmax = nmax_;
+            current_ = Utils.iclock();
+            lostrate_ = lostrate / 2;
+            rttmin_ = rttmin / 2;
+            rttmax_ = rttmax / 2;
+            nmax_ = nmax;
         }
 
+        public void Clear()
+        {
+            p12_.Clear();
+            p21_.Clear();
+        }
+
+        // 发送数据
+        // peer - 端点0/1，从0发送，从1接收；从1发送从0接收
         public void Send(int peer, byte[] data, int size)
         {
             if (peer == 0)
             {
                 tx1++;
-                if (r12.Next(100) < lostrate)
+                if (r12_.Next(100) < lostrate_)
                     return;
-                if (p12.Count >= nmax)
+                if (p12_.Count >= nmax_)
                     return;
             }
             else
             {
                 tx2++;
-                if (r21.Next(100) < lostrate)
+                if (r21_.Next(100) < lostrate_)
                     return;
-                if (p21.Count >= nmax)
+                if (p21_.Count >= nmax_)
                     return;
             }
             var pkt = new DelayPacket(data, size);
-            current = Utils.iclock();
-            Int32 delay = rttmin;
-            if (rttmax > rttmin)
-                delay += rand.Next() % (rttmax - rttmin);
-            pkt.SetTs(current + (UInt32)delay);
+            current_ = Utils.iclock();
+            Int32 delay = rttmin_;
+            if (rttmax_ > rttmin_)
+                delay += rand_.Next() % (rttmax_ - rttmin_);
+            pkt.SetTs(current_ + (UInt32)delay);
             if (peer == 0)
             {
-                p12.Add(pkt);
+                p12_.AddLast(pkt);
             }
             else
             {
-                p21.Add(pkt);
+                p21_.AddLast(pkt);
             }
         }
 
@@ -121,28 +130,28 @@ namespace Network
             DelayPacket pkt;
             if (peer == 0)
             {
-                if (p21.Count == 0)
+                if (p21_.Count == 0)
                     return -1;
-                pkt = p21[0];
+                pkt = p21_.First.Value;
             }
             else
             {
-                if (p12.Count == 0)
+                if (p12_.Count == 0)
                     return -1;
-                pkt = p12[0];
+                pkt = p12_.First.Value;
             }
-            current = Utils.iclock();
-            if (current < pkt.Ts())
+            current_ = Utils.iclock();
+            if (current_ < pkt.Ts())
                 return -2;
             if (maxsize < pkt.Size())
                 return -3;
             if (peer == 0)
-                p21.RemoveAt(0);
+                p21_.RemoveFirst();
             else
-                p12.RemoveAt(0);
+                p12_.RemoveFirst();
 
             maxsize = pkt.Size();
-            Array.Copy(pkt.Ptr(), 0, data, 0, maxsize);
+            Array.Copy(pkt.Data(), 0, data, 0, maxsize);
             return maxsize;
         }
     }
