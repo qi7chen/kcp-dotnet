@@ -6,18 +6,7 @@ using System;
 using System.Collections.Generic;
 
 namespace Network
-{
-	public class Utils
-    {
-        private static readonly DateTime epoch = new DateTime(2000, 1, 1);
-
-        public static UInt32 iclock()
-        {
-            var now = Convert.ToInt64(DateTime.UtcNow.Subtract(epoch).TotalMilliseconds);
-            return (UInt32)(now & 0xFFFFFFFF);
-        }
-    }
-	
+{	
     // 带延迟的数据包
     public class DelayPacket
     {
