@@ -55,9 +55,7 @@ namespace Network
         // decode 8 bits unsigned int
         public static byte ikcp_decode8u(byte[] p, ref int offset)
         {
-            int pos = offset;
-            offset += 1;
-            return p[pos];
+            return p[offset++];
         }
 
         // encode 16 bits unsigned int (lsb)
@@ -208,11 +206,14 @@ namespace Network
         public delegate void OutputDelegate(byte[] data, int size, object user);
         OutputDelegate output_;
 
-        public KCP(UInt32 conv, object ud)
+        // create a new kcp control object, 'conv' must equal in two endpoint
+        // from the same connection. 'user' will be passed to the output callback
+        // output callback can be setup like this: 'kcp->output = my_udp_output'
+        public KCP(UInt32 conv, object user)
         {
             Debug.Assert(BitConverter.IsLittleEndian); // we only support little endian device
 
-            user_ = ud;
+            user_ = user;
             conv_ = conv;
             snd_wnd_ = IKCP_WND_SND;
             rcv_wnd_ = IKCP_WND_RCV;
@@ -232,6 +233,7 @@ namespace Network
             rcv_buf_ = new LinkedList<Segment>();
         }
 
+        // release kcp control object
         public void Release()
         {
             snd_buf_.Clear();
@@ -337,7 +339,7 @@ namespace Network
             return len;
         }
 
-        // peek data size
+        // check the size of next message in the recv queue
         public int PeekSize()
         {
             if (rcv_queue_.Count == 0)
@@ -370,7 +372,7 @@ namespace Network
                 return -1;
 
             //
-            // we do not implement streaming mode here as in ikcp.c
+            // not implement streaming mode here as ikcp.c
             //
 
             int count = 0;
@@ -596,7 +598,7 @@ namespace Network
             }
         }
 
-        // input data
+        // when you received a low level packet (eg. UDP packet), call it
         public int Input(byte[] data, int offset, int size)
         {
             UInt32 maxack = 0;
@@ -744,7 +746,7 @@ namespace Network
             return 0;
         }
 
-        // ikcp_flush
+        // flush pending data
         void Flush()
         {
             int change = 0;
@@ -1033,6 +1035,7 @@ namespace Network
             return current + minimal;
         }
 
+        // change MTU size, default is 1400
         public int SetMTU(int mtu)
         {
             if (mtu < 50 || mtu < IKCP_OVERHEAD)
@@ -1056,6 +1059,11 @@ namespace Network
             return 0;
         }
 
+        // fastest: ikcp_nodelay(kcp, 1, 20, 2, 1)
+        // nodelay: 0:disable(default), 1:enable
+        // interval: internal update timer interval in millisec, default is 100ms 
+        // resend: 0:disable fast resend(default), 1:enable fast resend
+        // nc: 0:normal congestion control(default), 1:disable congestion control
         public int NoDelay(int nodelay, int interval, int resend, int nc)
         {
             if (nodelay >= 0)
@@ -1089,6 +1097,7 @@ namespace Network
             return 0;
         }
 
+        // set maximum window size: sndwnd=32, rcvwnd=32 by default
         public int WndSize(int sndwnd, int rcvwnd)
         {
             if (sndwnd > 0)
@@ -1098,11 +1107,13 @@ namespace Network
             return 0;
         }
 
+        // get how many packet is waiting to be sent
         public int WaitSnd()
         {
             return (int)(nsnd_buf_ + nsnd_que_);
         }
 
+        // read conv
         public UInt32 GetConv()
         {
             return conv_;
