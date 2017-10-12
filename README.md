@@ -6,13 +6,14 @@ A KCP C# implementation for Unity3D
 ## Prerequisites
 
 * .net core 2.0 (https://dotnet.github.io/)
-* Golang (http://golang.org)
+* Golang toolchain (http://golang.org)
 
 ## How to 
 
 ### Start Server
 
 ```
+go get -v github.com/xtaci/kcp-go
 go run server.go
 ```
 
