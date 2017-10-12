@@ -1,4 +1,9 @@
-﻿using System;
+﻿// Copyright (C) 2017 ichenq@outlook.com. All rights reserved.
+// Distributed under the terms and conditions of the MIT License.
+// See accompanying files LICENSE.
+
+using System;
+using System.Text;
 using System.Threading;
 using System.Diagnostics;
 using Network;
@@ -159,11 +164,63 @@ namespace UnitTest
             Console.Read();
         }
 
+
         static void Main(string[] args)
         {
-            KCPTest(0); // 默认模式，类似 TCP：正常模式，无快速重传，常规流控
-            KCPTest(1); // 普通模式，关闭流控等
-            KCPTest(2); // 快速模式，所有开关都打开，且关闭流控
+            string testcase = "kcp";
+            if (args.Length > 0)
+            {
+                testcase = args[0];
+            }
+
+            if (testcase == "kcp")
+            {
+                KCPTest(0); // 默认模式，类似 TCP：正常模式，无快速重传，常规流控
+                KCPTest(1); // 普通模式，关闭流控等
+                KCPTest(2); // 快速模式，所有开关都打开，且关闭流控
+            }
+            else if (testcase == "socket")
+            {
+                TestSocket();
+            }
+        }
+
+
+        static void TestSocket()
+        {
+            UInt32 conv = 0x12345678;
+            var counter = 1;
+            var originText = "a quick brown fox jumps over the lazy dog";
+            var rawbytes = Encoding.UTF8.GetBytes(String.Format("{0} {1}", originText, counter));
+
+            KCPSocket sock = new KCPSocket();
+            sock.SetHandler((byte[] data, int size) =>
+            {
+                Console.WriteLine(Encoding.UTF8.GetString(data, 0, size));
+
+                Thread.Sleep(500);
+                rawbytes = Encoding.UTF8.GetBytes(String.Format("{0} {1}", originText, ++counter));
+                sock.Send(rawbytes, 0, rawbytes.Length);
+            });
+
+            sock.Connect(conv, "127.0.0.1", 9527);
+            sock.StartRead();
+            sock.Send(rawbytes, 0, rawbytes.Length);
+
+            while (true)
+            {
+                Thread.Sleep(100);
+                try
+                {
+                    sock.Update(Utils.iclock());
+                }
+                catch(Exception ex)
+                {
+                    sock.Close();
+                    Console.WriteLine("Exception: {0}", ex);
+                    break;
+                }
+            }
         }
     }
 }

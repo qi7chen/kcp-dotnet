@@ -13,7 +13,7 @@ namespace Network
 
         public static UInt32 iclock()
         {
-            var now = Convert.ToInt64(DateTime.UtcNow.Subtract(twepoch).TotalMilliseconds);
+            var now = Convert.ToInt64(DateTime.Now.Subtract(twepoch).TotalMilliseconds);
             return (UInt32)(now & 0xFFFFFFFF);
         }
 
