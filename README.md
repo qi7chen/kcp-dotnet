@@ -1,5 +1,5 @@
 # kcp-dotnet
-A KCP C# implementation for .net core
+A [KCP](https://github.com/skywind3000/kcp) C# implementation for .net core
 
 **CAUTION** this project is still NOT production ready.
 
