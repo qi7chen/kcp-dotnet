@@ -6,20 +6,29 @@ A KCP C# implementation for .net core
 ## Prerequisites
 
 * .net core 2.0 (https://dotnet.github.io/)
-* Golang toolchain (http://golang.org)
+* Golang toolchain(optional) (http://golang.org)
 
 ## How to 
 
-### Start Server
+### Run test case
+
+```
+git clone https://github.com/ichenq/kcp-dotnet
+cd kcp-dotnet
+dotnet run
+```
+
+### Communicate with kcp-go
+
+server
 
 ```
 go get -v github.com/xtaci/kcp-go
 go run server.go
 ```
 
-### Start Client
+client
+
 ```
-git clone https://github.com/ichenq/kcp-dotnet
-cd kcp-dotnet
-dotnet run
+dotnet run socket
 ```
