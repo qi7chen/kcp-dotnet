@@ -528,7 +528,7 @@ namespace Network
             }
             acklist_[ackcount_ * 2] = sn;
             acklist_[ackcount_ * 2 + 1] = ts;
-            ackblock_++;
+            ackcount_++;
         }
 
         void ACKGet(int pos, ref UInt32 sn, ref UInt32 ts)
