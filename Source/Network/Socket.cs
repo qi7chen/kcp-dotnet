@@ -11,7 +11,7 @@ using System.Diagnostics;
 
 namespace Network
 {
-    internal struct SocketStateObject
+    internal struct UDPSocketStateObject
     {
         internal Socket socket;
         internal EndPoint remote;
@@ -55,6 +55,11 @@ namespace Network
         public void SetHandler(Action<byte[], int> cb)
         {
             handler = cb;
+        }
+
+        public KCP GetKCPObject()
+        {
+            return kcp;
         }
 
         public void Connect(UInt32 conv, string host, UInt16 port)
@@ -131,7 +136,7 @@ namespace Network
 
         public void StartRead()
         {
-            SocketStateObject state = new SocketStateObject
+            UDPSocketStateObject state = new UDPSocketStateObject
             {
                 obj = this,
                 socket = socket,
@@ -147,7 +152,7 @@ namespace Network
             needUpdate = true;
         }
 
-        void PostReadRequest(SocketStateObject state)
+        void PostReadRequest(UDPSocketStateObject state)
         {
             socket.BeginReceiveFrom(state.buf, 0, state.buf.Length, 0, ref remoteEnd,
                 new AsyncCallback(RecvCallback), state);
@@ -155,7 +160,7 @@ namespace Network
 
         public static void RecvCallback(IAsyncResult ar)
         {
-            SocketStateObject state = (SocketStateObject)ar.AsyncState;
+            UDPSocketStateObject state = (UDPSocketStateObject)ar.AsyncState;
             try
             {
                 int bytesRead = state.socket.EndReceiveFrom(ar, ref state.remote);
@@ -178,7 +183,7 @@ namespace Network
 
         void UDPSendTo(byte[] data, int offset, int size)
         {
-            SocketStateObject state = new SocketStateObject
+            UDPSocketStateObject state = new UDPSocketStateObject
             {
                 obj = this,
                 socket = socket,
@@ -188,7 +193,7 @@ namespace Network
 
         public static void WriteCallback(IAsyncResult ar)
         {
-            SocketStateObject state = (SocketStateObject)ar.AsyncState;
+            UDPSocketStateObject state = (UDPSocketStateObject)ar.AsyncState;
             try
             {
                 state.socket.EndSendTo(ar);
