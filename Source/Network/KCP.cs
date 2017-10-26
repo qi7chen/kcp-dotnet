@@ -1028,7 +1028,7 @@ namespace Network
                     tm_packet = diff;
             }
 
-            UInt32 minimal = (UInt32)(tm_packet < (int)ts_flush ? tm_packet : (int)ts_flush);
+            UInt32 minimal = (UInt32)(tm_packet < tm_flush ? tm_packet : tm_flush);
             if (minimal >= interval_)
                 minimal = interval_;
 
