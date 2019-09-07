@@ -1,3 +1,7 @@
+// Copyright (C) 2017 prototyped.cn All rights reserved.
+// Distributed under the terms and conditions of the MIT License.
+// See accompanying files LICENSE.
+
 package main
 
 import (

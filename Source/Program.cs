@@ -1,4 +1,4 @@
-﻿// Copyright (C) 2017 ichenq@outlook.com. All rights reserved.
+﻿// Copyright (C) 2017 prototyped.cn All rights reserved.
 // Distributed under the terms and conditions of the MIT License.
 // See accompanying files LICENSE.
 
